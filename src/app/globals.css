@@ -1,26 +1,68 @@
 @import "tailwindcss";
 
+@theme {
+  --color-ground: #08090A;
+  --color-surface-1: #16171C;
+  --color-surface-2: #1E1F25;
+  --color-surface-3: #26272E;
+  --color-primary: #F7F8F8;
+  --color-secondary: #9CA3AF;
+  --color-muted: #6B7280;
+  --color-accent: #5E6AD2;
+  --color-hairline: rgba(255, 255, 255, 0.06);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #08090A;
+  --foreground: #F7F8F8;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Linear-specific utilities */
+@layer utilities {
+  .hairline-border {
+    border: 1px solid var(--color-hairline);
+  }
+  
+  .hairline-border-t {
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .hairline-border-b {
+    border-bottom: 1px solid var(--color-hairline);
+  }
+  
+  .glass-panel {
+    background: var(--color-surface-1);
+    border: 1px solid var(--color-hairline);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  
+  .keyboard-chip {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-hairline);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-secondary);
+  }
+
+  .text-gradient {
+    background: linear-gradient(to right, #F7F8F8, #9CA3AF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 }
