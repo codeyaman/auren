@@ -1,15 +1,17 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 export default function TermsPage() {
+  const router = useRouter();
+
   return (
     <div className="min-h-screen bg-[var(--color-ground)] p-8 md:p-24 max-w-4xl mx-auto">
-      <Link href="/" className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-white mb-12 transition-colors">
-        <ArrowLeft size={16} /> Back to Home
-      </Link>
+      <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-white mb-12 transition-colors bg-transparent border-none cursor-pointer p-0 font-sans text-base">
+        <ArrowLeft size={16} /> Go Back
+      </button>
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}

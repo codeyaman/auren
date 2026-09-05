@@ -2,8 +2,12 @@
 
 import { motion, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Mic, Sparkles } from "lucide-react";
+import { ArrowRight, Mic, Sparkles, LogIn } from "lucide-react";
 import { useRef } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
 
 export default function LandingPage() {
   const containerRef = useRef(null);
@@ -16,6 +20,18 @@ export default function LandingPage() {
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   const quintEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
+  const { user, loading } = useAuth();
+  const isAuthenticated = !loading && !!user;
+  const router = useRouter();
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Error signing in with Google", error);
+    }
+  };
 
   return (
     <div ref={containerRef} className="relative bg-[var(--color-ground)] min-h-[200vh]">
@@ -26,12 +42,21 @@ export default function LandingPage() {
         <div className="flex gap-6 items-center text-sm font-medium">
           <Link href="/docs" className="hover:opacity-70 transition-opacity">Docs</Link>
           <Link href="/terms" className="hover:opacity-70 transition-opacity">Terms</Link>
-          <Link 
-            href="/dashboard" 
-            className="px-4 py-2 bg-white text-black rounded-full hover:scale-105 transition-transform"
-          >
-            Launch App
-          </Link>
+          {isAuthenticated ? (
+            <Link 
+              href="/dashboard" 
+              className="px-4 py-2 bg-white text-black rounded-full hover:scale-105 transition-transform"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <button 
+              onClick={handleSignIn}
+              className="px-4 py-2 bg-white text-black rounded-full hover:scale-105 transition-transform flex items-center gap-2 cursor-pointer"
+            >
+              <LogIn size={14} /> Sign In
+            </button>
+          )}
         </div>
       </nav>
 
@@ -63,17 +88,30 @@ export default function LandingPage() {
             Auren listens to your voice in real-time, providing instant grammar and vocabulary feedback to elevate your spoken English to absolute fluency.
           </p>
 
-          <Link href="/dashboard">
+          {isAuthenticated ? (
+            <Link href="/dashboard">
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-[var(--color-primary)] text-[var(--color-ground)] rounded-full text-lg font-semibold overflow-hidden"
+              >
+                <span className="relative z-10">Go to Dashboard</span>
+                <ArrowRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+              </motion.button>
+            </Link>
+          ) : (
             <motion.button 
+              onClick={handleSignIn}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-[var(--color-primary)] text-[var(--color-ground)] rounded-full text-lg font-semibold overflow-hidden"
+              className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-[var(--color-primary)] text-[var(--color-ground)] rounded-full text-lg font-semibold overflow-hidden cursor-pointer"
             >
-              <span className="relative z-10">Start Speaking</span>
+              <span className="relative z-10">Explore</span>
               <ArrowRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />
               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
             </motion.button>
-          </Link>
+          )}
         </motion.div>
       </div>
 
@@ -133,11 +171,20 @@ export default function LandingPage() {
             <h2 className="text-6xl md:text-8xl font-display font-bold text-[var(--color-primary)] tracking-tighter">
               Ready to sound native?
             </h2>
-            <Link href="/dashboard">
-                <button className="px-12 py-6 bg-white text-black rounded-full text-xl font-bold hover:scale-105 transition-transform shadow-xl">
-                  Open Auren Dashboard
-                </button>
-            </Link>
+            {isAuthenticated ? (
+              <Link href="/dashboard">
+                  <button className="px-12 py-6 bg-white text-black rounded-full text-xl font-bold hover:scale-105 transition-transform shadow-xl">
+                    Open Auren Dashboard
+                  </button>
+              </Link>
+            ) : (
+              <button 
+                onClick={handleSignIn}
+                className="px-12 py-6 bg-white text-black rounded-full text-xl font-bold hover:scale-105 transition-transform shadow-xl inline-flex items-center gap-3 cursor-pointer"
+              >
+                Explore <ArrowRight size={24} />
+              </button>
+            )}
           </div>
         </div>
       </div>

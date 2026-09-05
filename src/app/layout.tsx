@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
 import { SmoothScroll } from "@/components/SmoothScroll";
+import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
   title: "Auren | AI Voice Tutor",
@@ -30,13 +30,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${interTight.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
-        <SmoothScroll>{children}</SmoothScroll>
-      </body>
-    </html>
+    <AuthProvider>
+      <html
+        lang="en"
+        className={`${inter.variable} ${interTight.variable} ${geistMono.variable} h-full antialiased`}
+      >
+        <body className="min-h-full flex flex-col">
+            <SmoothScroll>{children}</SmoothScroll>
+        </body>
+      </html>
+    </AuthProvider>
   );
 }

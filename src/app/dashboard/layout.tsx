@@ -1,14 +1,28 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Settings, Home, MessageSquare, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Settings, Home, MessageSquare, Menu, X, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter, usePathname } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/");
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return <div className="h-screen w-full bg-[var(--color-ground)] flex items-center justify-center text-[var(--color-primary)]">Loading...</div>;
+  }
 
   const navItems = [
     { name: "Home", href: "/", icon: Home },
@@ -50,12 +64,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         <div className="mt-auto pt-4 hairline-border-t pb-2">
-           <div className="px-3 py-2 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[var(--color-surface-3)]"></div>
-              <div className="flex flex-col">
-                <span className="text-xs font-medium text-[var(--color-primary)]">Guest User</span>
-                <span className="text-[10px] text-[var(--color-muted)]">Local Storage</span>
+           <div className="px-3 py-2 flex items-center justify-between gap-3 group">
+              <div className="flex items-center gap-3">
+                {user?.photoURL ? (
+                  <img src={user.photoURL} alt="User avatar" className="w-8 h-8 rounded-full" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-[var(--color-surface-3)]"></div>
+                )}
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-[var(--color-primary)] truncate max-w-[120px]">{user?.displayName || "User"}</span>
+                  <span className="text-[10px] text-[var(--color-muted)]">Local Storage</span>
+                </div>
               </div>
+              <button 
+                onClick={() => signOut(auth)}
+                className="text-[var(--color-muted)] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 p-1"
+                title="Sign Out"
+              >
+                <LogOut size={16} />
+              </button>
            </div>
         </div>
       </motion.aside>
