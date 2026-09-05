@@ -1,316 +1,147 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, useScroll, useTransform } from "framer-motion";
+import Link from "next/link";
+import { ArrowRight, Mic, Sparkles } from "lucide-react";
+import { useRef } from "react";
 
-export default function Home() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [interimTranscript, setInterimTranscript] = useState('');
-  const [feedback, setFeedback] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+export default function LandingPage() {
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"]
+  });
 
-  const recognitionRef = useRef<any>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isNewTurnRef = useRef(false);
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
-  useEffect(() => {
-    // Initialize SpeechRecognition on mount
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event: any) => {
-          setErrorMessage(''); // Clear errors when getting results
-          let final = '';
-          let interim = '';
-
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              final += event.results[i][0].transcript;
-            } else {
-              interim += event.results[i][0].transcript;
-            }
-          }
-
-          if (isNewTurnRef.current && (final || interim)) {
-            setTranscript(final);
-            setFeedback('');
-            isNewTurnRef.current = false;
-          } else {
-            setTranscript((prev) => prev + final);
-          }
-          
-          setInterimTranscript(interim);
-
-          // Reset silence timer every time we get a result
-          resetSilenceTimer();
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-          clearTimeout(silenceTimerRef.current as NodeJS.Timeout);
-          // If we have text AND they actually spoke in this turn, process it
-          if ((transcriptRef.current || interimRef.current) && !isNewTurnRef.current) {
-             processAudio();
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-          setErrorMessage(`Microphone error: ${event.error}. Please ensure microphone permissions are granted and you are using Google Chrome.`);
-          setIsRecording(false);
-        };
-
-        recognitionRef.current = recognition;
-      } else {
-        console.warn('Speech Recognition API not supported in this browser.');
-      }
-    }
-
-    return () => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      if (recognitionRef.current) recognitionRef.current.stop();
-    };
-  }, []);
-
-  // Update transcript ref for the process step
-  const transcriptRef = useRef(transcript);
-  const interimRef = useRef(interimTranscript);
-  useEffect(() => {
-    transcriptRef.current = transcript;
-    interimRef.current = interimTranscript;
-  }, [transcript, interimTranscript]);
-
-  const resetSilenceTimer = () => {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-    }
-    silenceTimerRef.current = setTimeout(() => {
-      // 2 seconds of silence
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    }, 2000);
-  };
-
-  const processAudio = async () => {
-    setIsProcessing(true);
-    setInterimTranscript('');
-    
-    // The final combined text
-    const fullText = transcriptRef.current + ' ' + interimRef.current;
-    const finalTranscript = fullText.trim();
-    setTranscript(finalTranscript);
-
-    if (!finalTranscript) {
-      setIsProcessing(false);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: finalTranscript }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to analyze transcript');
-      }
-
-      setFeedback(data.feedback);
-      speakFeedback(data.feedback);
-    } catch (error: any) {
-      console.error(error);
-      setFeedback('Error: ' + error.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const speakFeedback = (text: string) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      
-      // Try to find an English voice
-      const voices = window.speechSynthesis.getVoices();
-      const englishVoice = voices.find(v => v.lang.startsWith('en-'));
-      if (englishVoice) {
-        utterance.voice = englishVoice;
-      }
-      
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        
-        // Auto-restart listening but keep text on screen until they reply
-        isNewTurnRef.current = true;
-        setIsRecording(true);
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.start();
-          } catch (e) {
-            console.error('Could not start recognition', e);
-          }
-        }
-      };
-
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      if (recognitionRef.current) recognitionRef.current.stop();
-      setIsRecording(false);
-    } else {
-      setTranscript('');
-      setInterimTranscript('');
-      setFeedback('');
-      setIsRecording(true);
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.start();
-        } catch (e) {
-          console.error('Could not start recognition', e);
-        }
-      }
-    }
-  };
-
-  // Linear quint easing
   const quintEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-12 lg:p-24 bg-[var(--color-ground)] relative overflow-hidden">
+    <div ref={containerRef} className="relative bg-[var(--color-ground)] min-h-[200vh]">
       
-      {/* Background subtle mesh gradient in hero */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.5 }}
-        transition={{ duration: 1.5, ease: quintEase }}
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-[#5E6AD2]/10 to-transparent blur-3xl rounded-full pointer-events-none" 
-      />
-
-      <div className="z-10 w-full max-w-3xl flex flex-col items-center gap-12 pt-16">
-        
-        {/* Header */}
-        <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, ease: quintEase }}
-          className="flex flex-col items-center gap-4 text-center"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <span className="keyboard-chip">CMD</span>
-            <span className="keyboard-chip">K</span>
-            <span className="text-sm text-[var(--color-muted)] ml-2">to start practice</span>
-          </div>
-          <h1 className="text-5xl lg:text-6xl font-[var(--font-display)] font-semibold tracking-tight text-[var(--color-primary)]">
-            Auren Voice Tutor
-          </h1>
-          <p className="text-[var(--color-secondary)] max-w-lg text-lg">
-            Real-time language coaching. Speak naturally, get instant grammar and vocabulary feedback.
-          </p>
-        </motion.div>
-
-        {/* Main Interface */}
-        <motion.div 
-          initial={{ y: 40, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: quintEase }}
-          className="w-full glass-panel flex flex-col items-center p-8 lg:p-12 mt-8 relative"
-        >
-          {/* Status Indicator */}
-          <div className="absolute top-6 left-6 flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : isSpeaking ? 'bg-blue-500 animate-pulse' : isProcessing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
-            <span className="text-xs text-[var(--color-secondary)] uppercase tracking-wider font-mono">
-              {isRecording ? 'Listening...' : isSpeaking ? 'Speaking...' : isProcessing ? 'Analyzing...' : 'Ready'}
-            </span>
-          </div>
-
-          <div className="flex flex-col items-center w-full min-h-[200px] justify-center mt-6">
-            
-            {errorMessage && (
-              <div className="w-full bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-lg mb-6 text-sm">
-                {errorMessage}
-              </div>
-            )}
-
-            {!transcript && !interimTranscript && !isRecording && !isProcessing && !errorMessage && (
-              <div className="text-[var(--color-muted)] text-center">
-                Press the microphone to begin speaking in English.
-              </div>
-            )}
-
-            {isRecording && (
-              <div className="w-full flex justify-center items-center gap-1 h-12 mb-6">
-                 {/* Visualizer bars placeholder */}
-                {[...Array(12)].map((_, i) => (
-                  <div key={i} className="w-1.5 bg-[var(--color-accent)] rounded-full animate-pulse" style={{ height: `${Math.max(10, Math.random() * 40)}px`, animationDelay: `${i * 0.1}s` }} />
-                ))}
-              </div>
-            )}
-
-            {(transcript || interimTranscript) && (
-              <div className="w-full space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-mono">You said</h3>
-                  <p className="text-xl text-[var(--color-primary)] font-medium leading-relaxed">
-                    {transcript} <span className="text-[var(--color-secondary)]">{interimTranscript}</span>
-                  </p>
-                </div>
-                
-                {feedback && (
-                  <div className="space-y-2 hairline-border-t pt-6">
-                    <h3 className="text-xs text-[var(--color-accent)] uppercase tracking-wider font-mono flex items-center gap-2">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                      Auren Feedback
-                    </h3>
-                    <p className="text-[var(--color-secondary)] leading-relaxed">
-                      {feedback}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Record Button */}
-          <button 
-            onClick={toggleRecording}
-            disabled={isProcessing || isSpeaking}
-            className={`mt-12 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
-              isRecording 
-                ? 'bg-red-500/10 border-red-500 text-red-500' 
-                : isProcessing || isSpeaking
-                ? 'bg-[var(--color-surface-2)] text-[var(--color-muted)] cursor-not-allowed opacity-50'
-                : 'bg-[var(--color-surface-2)] hairline-border text-[var(--color-primary)] hover:bg-[var(--color-surface-3)] hover:text-[var(--color-accent)]'
-            }`}
+      {/* Navigation */}
+      <nav className="fixed top-0 w-full z-50 p-6 flex justify-between items-center mix-blend-difference text-white">
+        <div className="font-display font-semibold text-xl tracking-tight">Auren</div>
+        <div className="flex gap-6 items-center text-sm font-medium">
+          <Link href="/docs" className="hover:opacity-70 transition-opacity">Docs</Link>
+          <Link href="/terms" className="hover:opacity-70 transition-opacity">Terms</Link>
+          <Link 
+            href="/dashboard" 
+            className="px-4 py-2 bg-white text-black rounded-full hover:scale-105 transition-transform"
           >
-            {isRecording ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-            )}
-          </button>
+            Launch App
+          </Link>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <div className="h-screen sticky top-0 flex flex-col justify-center items-center overflow-hidden">
+        
+        <motion.div 
+          style={{ y, opacity }}
+          className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#5E6AD2]/20 via-[var(--color-ground)] to-[var(--color-ground)]"
+        />
+
+        <motion.div 
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 1.2, ease: quintEase, delay: 0.2 }}
+          className="z-10 text-center px-4 max-w-5xl"
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full hairline-border bg-[var(--color-surface-1)] text-xs text-[var(--color-secondary)] mb-8 uppercase tracking-widest">
+            <Sparkles size={12} /> The Future of Language Learning
+          </div>
+          
+          <h1 className="text-6xl md:text-8xl lg:text-9xl font-display font-bold tracking-tighter text-[var(--color-primary)] leading-[0.9] mb-8">
+            Speak.<br />
+            <span className="text-[var(--color-muted)]">Perfect.</span><br />
+            Repeat.
+          </h1>
+          
+          <p className="text-lg md:text-xl text-[var(--color-secondary)] max-w-2xl mx-auto mb-12 font-medium">
+            Auren listens to your voice in real-time, providing instant grammar and vocabulary feedback to elevate your spoken English to absolute fluency.
+          </p>
+
+          <Link href="/dashboard">
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-[var(--color-primary)] text-[var(--color-ground)] rounded-full text-lg font-semibold overflow-hidden"
+            >
+              <span className="relative z-10">Start Speaking</span>
+              <ArrowRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+            </motion.button>
+          </Link>
         </motion.div>
       </div>
-    </main>
+
+      {/* Features Section (Stacked Cards) */}
+      <div className="relative z-20">
+        
+        {/* Card 1 */}
+        <div className="sticky top-0 h-screen w-full bg-[var(--color-ground)] flex flex-col justify-center p-8 md:p-24 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+          <div className="max-w-6xl mx-auto w-full grid md:grid-cols-2 gap-16 items-center">
+            <div className="space-y-6">
+              <h2 className="text-4xl md:text-6xl font-display font-bold tracking-tight text-[var(--color-primary)]">
+                Real-time analysis,<br />zero latency.
+              </h2>
+              <p className="text-[var(--color-secondary)] text-lg md:text-xl leading-relaxed max-w-lg">
+                Experience language tutoring that feels like a natural conversation. Auren analyzes your sentence structure, vocabulary choices, and pronunciation the moment you stop speaking.
+              </p>
+            </div>
+            <div className="aspect-square rounded-3xl glass-panel flex flex-col items-center justify-center p-8 relative overflow-hidden group">
+               <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-accent)]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+               <Mic size={64} className="text-[var(--color-primary)] mb-8" />
+               <div className="w-full h-1 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
+                 <motion.div 
+                   animate={{ x: ["-100%", "100%"] }}
+                   transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                   className="w-1/3 h-full bg-[var(--color-accent)] rounded-full"
+                 />
+               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2 */}
+        <div className="sticky top-0 h-screen w-full bg-[var(--color-surface-1)] flex flex-col justify-center p-8 md:p-24 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] border-t hairline-border">
+          <div className="max-w-6xl mx-auto w-full grid md:grid-cols-2 gap-16 items-center md:flex-row-reverse">
+             <div className="aspect-square rounded-3xl glass-panel flex items-center justify-center p-8 order-2 md:order-1 relative overflow-hidden shadow-2xl bg-[var(--color-ground)]">
+               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-luminosity grayscale" />
+               <div className="relative z-10 text-[var(--color-primary)] text-3xl font-mono tracking-tight leading-loose text-center font-medium">
+                 &quot;I think we should to go.&quot;<br/>
+                 <span className="text-[var(--color-secondary)] text-xl">↓</span><br/>
+                 <span className="text-[var(--color-accent)]">&quot;I think we should go.&quot;</span>
+               </div>
+             </div>
+             <div className="space-y-6 order-1 md:order-2">
+              <h2 className="text-4xl md:text-6xl font-display font-bold tracking-tight text-[var(--color-primary)]">
+                Contextual grammar correction.
+              </h2>
+              <p className="text-[var(--color-secondary)] text-lg md:text-xl leading-relaxed max-w-lg">
+                Don&apos;t just learn rules; learn how to apply them. Auren provides nuanced feedback on why a phrase sounds unnatural and suggests native-sounding alternatives.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer CTA (Card 3) */}
+        <div className="sticky top-0 h-screen w-full bg-[var(--color-surface-2)] flex flex-col items-center justify-center p-8 md:p-24 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] border-t hairline-border">
+          <div className="text-center max-w-4xl mx-auto space-y-12">
+            <h2 className="text-6xl md:text-8xl font-display font-bold text-[var(--color-primary)] tracking-tighter">
+              Ready to sound native?
+            </h2>
+            <Link href="/dashboard">
+                <button className="px-12 py-6 bg-white text-black rounded-full text-xl font-bold hover:scale-105 transition-transform shadow-xl">
+                  Open Auren Dashboard
+                </button>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+    </div>
   );
 }

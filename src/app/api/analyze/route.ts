@@ -38,6 +38,9 @@ async function callOpenRouter(transcript: string) {
   }
 
   const data = await response.json();
+  if (!data.choices || !data.choices[0]) {
+    throw new Error(`OpenRouter API returned unexpected data: ${JSON.stringify(data)}`);
+  }
   return data.choices[0].message.content;
 }
 
@@ -90,12 +93,14 @@ export async function POST(request: Request) {
     try {
       // 1. Try OpenRouter first
       feedback = await callOpenRouter(transcript);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.warn('OpenRouter failed, falling back to Gemini...', error.message);
       
       // 2. Fallback to native Gemini API
       try {
         feedback = await callGemini(transcript);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (geminiError: any) {
         console.error('Gemini fallback also failed:', geminiError.message);
         return NextResponse.json(
