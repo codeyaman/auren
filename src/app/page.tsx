@@ -5,8 +5,6 @@ import Link from "next/link";
 import { ArrowRight, Mic, Sparkles, LogIn } from "lucide-react";
 import { useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 
 export default function LandingPage() {
@@ -24,13 +22,8 @@ export default function LandingPage() {
   const isAuthenticated = !loading && !!user;
   const router = useRouter();
 
-  const handleSignIn = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      router.push("/dashboard");
-    } catch (error) {
-      console.error("Error signing in with Google", error);
-    }
+  const handleSignIn = () => {
+    router.push("/login");
   };
 
   return (
