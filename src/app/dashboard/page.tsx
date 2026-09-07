@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useChatHistory, ChatSession } from "@/hooks/useChatHistory";
-import { Mic, Square, Trash2, Clock, CheckCircle2 } from "lucide-react";
+import { Mic, Square, Trash2, Clock, CheckCircle2, Download } from "lucide-react";
 
 export default function DashboardPage() {
   const { sessions, activeSessionId, createSession, addInteraction, deleteSession, setActiveSessionId } = useChatHistory();
@@ -39,6 +39,22 @@ export default function DashboardPage() {
   const quintEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
+
+  const downloadSession = (session: ChatSession, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (session.interactions.length === 0) return;
+    
+    const text = session.interactions.map(i => `You: ${i.transcript}\n\nAuren: ${i.feedback}\n\n---\n`).join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Auren_Chat_${new Date(session.date).toLocaleDateString().replace(/\//g, '-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   if (!mounted) return null;
 
@@ -83,12 +99,22 @@ export default function DashboardPage() {
                     <Clock size={12} />
                     {new Date(session.date).toLocaleDateString()}
                   </div>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
-                    className="text-[var(--color-muted)] opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={(e) => downloadSession(session, e)}
+                      className="text-[var(--color-muted)] opacity-0 group-hover:opacity-100 hover:text-blue-400 transition-all"
+                      title="Download Chat"
+                    >
+                      <Download size={14} />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+                      className="text-[var(--color-muted)] opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
+                      title="Delete Chat"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-sm text-[var(--color-secondary)] line-clamp-2 leading-relaxed">
                   {session.interactions[0]?.transcript || "Empty session..."}
