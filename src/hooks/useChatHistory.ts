@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { db } from '@/lib/firebase';
+import { collection, doc, setDoc, getDocs, deleteDoc, query, orderBy } from 'firebase/firestore';
 
 export interface ChatInteraction {
   id: string;
@@ -14,68 +17,98 @@ export interface ChatSession {
 }
 
 export function useChatHistory() {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load from local storage on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('auren_history');
-      if (stored) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSessions(JSON.parse(stored));
+    if (!user) {
+      setSessions([]);
+      setIsLoaded(false);
+      return;
+    }
+
+    const loadHistory = async () => {
+      try {
+        const q = query(collection(db, `users/${user.uid}/sessions`), orderBy('date', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const loadedSessions: ChatSession[] = [];
+        querySnapshot.forEach((docSnap) => {
+          loadedSessions.push(docSnap.data() as ChatSession);
+        });
+        setSessions(loadedSessions);
+        setIsLoaded(true);
+      } catch (error) {
+        console.error("Error loading chat history:", error);
       }
-    } catch (e) {
-      console.error('Failed to load history:', e);
-    }
-  }, []);
+    };
 
-  // Save to local storage when sessions change
-  useEffect(() => {
-    try {
-      localStorage.setItem('auren_history', JSON.stringify(sessions));
-    } catch (e) {
-      console.error('Failed to save history:', e);
-    }
-  }, [sessions]);
+    loadHistory();
+  }, [user]);
 
   const createSession = () => {
+    if (!user) return '';
     const newSession: ChatSession = {
       id: crypto.randomUUID(),
       date: Date.now(),
       interactions: [],
     };
+    
     setSessions((prev) => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
+    
+    // Save to Firestore
+    setDoc(doc(db, `users/${user.uid}/sessions`, newSession.id), newSession).catch(err => 
+      console.error("Error creating session in DB:", err)
+    );
+    
     return newSession.id;
   };
 
   const addInteraction = (sessionId: string, transcript: string, feedback: string) => {
-    setSessions((prev) =>
-      prev.map((session) => {
+    if (!user) return;
+    
+    const newInteraction: ChatInteraction = {
+      id: crypto.randomUUID(),
+      transcript,
+      feedback,
+      timestamp: Date.now(),
+    };
+
+    setSessions((prev) => {
+      const newSessions = prev.map((session) => {
         if (session.id === sessionId) {
-          return {
+          const updatedSession = {
             ...session,
-            interactions: [
-              ...session.interactions,
-              {
-                id: crypto.randomUUID(),
-                transcript,
-                feedback,
-                timestamp: Date.now(),
-              },
-            ],
+            interactions: [...session.interactions, newInteraction],
           };
+          
+          // Update Firestore
+          setDoc(doc(db, `users/${user.uid}/sessions`, session.id), updatedSession).catch(err => 
+            console.error("Error updating session in DB:", err)
+          );
+          
+          return updatedSession;
         }
         return session;
-      })
-    );
+      });
+      return newSessions;
+    });
   };
 
-  const deleteSession = (sessionId: string) => {
+  const deleteSession = async (sessionId: string) => {
+    if (!user) return;
+    
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     if (activeSessionId === sessionId) {
       setActiveSessionId(null);
+    }
+    
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/sessions`, sessionId));
+    } catch (error) {
+      console.error("Error deleting session from DB:", error);
     }
   };
 
@@ -86,5 +119,6 @@ export function useChatHistory() {
     createSession,
     addInteraction,
     deleteSession,
+    isLoaded
   };
 }
