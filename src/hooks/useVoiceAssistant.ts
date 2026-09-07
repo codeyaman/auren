@@ -35,13 +35,30 @@ export function useVoiceAssistant({ onInteractionComplete }: UseVoiceAssistantPr
       
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-US';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
+      utterance.rate = 1.05; // Slightly faster for conversational feel
+      utterance.pitch = 1.05; // Slightly higher pitch for clarity
       
       const voices = window.speechSynthesis.getVoices();
-      const englishVoice = voices.find(v => v.lang.startsWith('en-'));
-      if (englishVoice) {
-        utterance.voice = englishVoice;
+      
+      // Premium Voice Selection Engine
+      // Hunts for hidden cloud-based or high-quality OS voices
+      let bestVoice = voices.find(v => 
+        v.lang.startsWith('en-') && 
+        (v.name.includes('Google') || 
+         v.name.includes('Premium') || 
+         v.name.includes('Natural') || 
+         v.name.includes('Siri') ||
+         v.name.includes('Samantha') ||
+         v.name.includes('Alex'))
+      );
+
+      // Fallback to any English voice
+      if (!bestVoice) {
+        bestVoice = voices.find(v => v.lang.startsWith('en-'));
+      }
+      
+      if (bestVoice) {
+        utterance.voice = bestVoice;
       }
       
       utterance.onstart = () => setIsSpeaking(true);
@@ -133,7 +150,9 @@ export function useVoiceAssistant({ onInteractionComplete }: UseVoiceAssistantPr
           let final = '';
           let interim = '';
 
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
+          // Rebuilding the entire transcript from index 0 prevents the mobile bug
+          // where interim and final results duplicate words ("the the").
+          for (let i = 0; i < event.results.length; ++i) {
             if (event.results[i].isFinal) {
               final += event.results[i][0].transcript;
             } else {
@@ -141,12 +160,12 @@ export function useVoiceAssistant({ onInteractionComplete }: UseVoiceAssistantPr
             }
           }
 
-          if (isNewTurnRef.current && (final || interim)) {
+          if (isNewTurnRef.current) {
             setTranscript(final);
             setFeedback('');
             isNewTurnRef.current = false;
           } else {
-            setTranscript((prev) => prev + final);
+            setTranscript(final);
           }
           
           setInterimTranscript(interim);

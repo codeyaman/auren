@@ -104,7 +104,7 @@ export default function DashboardPage() {
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.8, ease: quintEase }}
-        className="flex-1 flex flex-col items-center justify-center relative min-h-[60vh] lg:min-h-full glass-panel overflow-hidden"
+        className="flex-1 flex flex-col items-center justify-center relative min-h-[100dvh] lg:min-h-full glass-panel overflow-hidden"
       >
         {/* Status indicator top right */}
         <div className="absolute top-6 right-6 flex items-center gap-2 z-10">
@@ -115,7 +115,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Central visualizer area */}
-        <div className="flex flex-col items-center justify-center w-full max-w-2xl px-6 py-12 flex-1">
+        <div className="flex flex-col items-center justify-center w-full max-w-2xl px-6 py-12 pb-32 lg:pb-12 flex-1">
           
           <AnimatePresence mode="wait">
             {errorMessage ? (
